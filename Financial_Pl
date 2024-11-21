@@ -1,0 +1,139 @@
+import tkinter as tk
+from tkinter import messagebox
+from PIL import Image, ImageTk
+import json
+import os
+
+# Create main application window
+root = tk.Tk()
+root.title("Financial Coordinator")
+root.geometry("1000x600")
+
+# Load and set background image
+background_image = Image.open("C:/Users/Attilas/Desktop/Bill/Matrix/MyProjects/Python Financial Planner/financial_planner_bg.jpg")
+background_image = background_image.resize((1000, 600), Image.LANCZOS)  # Resize image to fit the window
+bg_image = ImageTk.PhotoImage(background_image)
+
+canvas = tk.Canvas(root, width=1000, height=600)
+canvas.pack(fill="both", expand=True)
+canvas.create_image(0, 0, image=bg_image, anchor="nw")
+
+# Local file to save credentials
+CREDENTIALS_FILE = "credentials.json"
+
+# Function to save credentials to a file
+def save_credentials(username, password):
+    credentials = {"username": username, "password": password}
+    with open(CREDENTIALS_FILE, "w") as file:
+        json.dump(credentials, file)
+
+# Function to load credentials from a file
+def load_credentials():
+    if os.path.exists(CREDENTIALS_FILE):
+        with open(CREDENTIALS_FILE, "r") as file:
+            return json.load(file)
+    return None
+
+# Load existing credentials if any
+credentials = load_credentials()
+stored_username = credentials["username"] if credentials else None
+stored_password = credentials["password"] if credentials else None
+
+# Signup Functionality
+def signup_process():
+    def handle_signup():
+        global stored_username, stored_password
+        username = username_entry.get()
+        password = password_entry.get()
+
+        if len(username) < 5:
+            messagebox.showerror("Error", "Username must be at least 5 characters long.")
+            return
+        if len(password) < 5:
+            messagebox.showerror("Error", "Password must be at least 5 characters long.")
+            return
+        if not any(char.isupper() for char in password):
+            messagebox.showerror("Error", "Password must contain at least one uppercase letter.")
+            return
+
+        # Save username and password locally
+        stored_username = username
+        stored_password = password
+        save_credentials(username, password)
+
+        messagebox.showinfo("Success", "Signup successful!")
+        signup_frame.destroy()  # Close the signup frame
+
+    # Create signup frame
+    signup_frame = tk.Frame(root, bg="white", padx=20, pady=20)
+    signup_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+    tk.Label(signup_frame, text="Sign Up", font=("Arial", 18), bg="white").pack(pady=10)
+    tk.Label(signup_frame, text="Username:", bg="white").pack(anchor="w")
+    username_entry = tk.Entry(signup_frame, width=30)
+    username_entry.pack(pady=5)
+
+    tk.Label(signup_frame, text="Password:", bg="white").pack(anchor="w")
+    password_entry = tk.Entry(signup_frame, show="*", width=30)
+    password_entry.pack(pady=5)
+
+    tk.Button(signup_frame, text="Sign Up", command=handle_signup).pack(pady=10)
+
+# Login Functionality
+def login_process():
+    def handle_login():
+        global stored_username, stored_password
+        username = username_entry.get()
+        password = password_entry.get()
+
+        if username != stored_username:
+            messagebox.showerror("Error", "Incorrect username. Try again.")
+            return
+        if password != stored_password:
+            messagebox.showerror("Error", "Incorrect password. Try again.")
+            return
+
+        messagebox.showinfo("Welcome", f"Welcome to your Financial Planner, {username}!")
+        login_frame.destroy()  # Close the login frame
+
+    # Create login frame
+    login_frame = tk.Frame(root, bg="white", padx=20, pady=20)
+    login_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+    tk.Label(login_frame, text="Login", font=("Arial", 18), bg="white").pack(pady=10)
+    tk.Label(login_frame, text="Username:", bg="white").pack(anchor="w")
+    username_entry = tk.Entry(login_frame, width=30)
+    username_entry.pack(pady=5)
+
+    tk.Label(login_frame, text="Password:", bg="white").pack(anchor="w")
+    password_entry = tk.Entry(login_frame, show="*", width=30)
+    password_entry.pack(pady=5)
+
+    tk.Button(login_frame, text="Login", command=handle_login).pack(pady=10)
+
+signup_button = tk.Button(
+    root,
+    text="Sign Up",
+    command=signup_process,  # Opens the signup process
+    font=("Arial", 14),
+    bg="lightblue",
+    padx=20,
+    pady=10,
+)
+
+login_button = tk.Button(
+    root,
+    text="Login",
+    command=login_process,  # Opens the login process
+    font=("Arial", 14),
+    bg="lightgreen",
+    padx=20,
+    pady=10,
+)
+
+# Place buttons on the canvas
+canvas.create_window(500, 200, window=signup_button)
+canvas.create_window(500, 300, window=login_button)
+
+# Run the GUI event loop
+root.mainloop()
