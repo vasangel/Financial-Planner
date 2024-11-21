@@ -1,8 +1,56 @@
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
-import json
 import os
+import re
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+
+# Initialize Firebase
+cred_path = os.path.join(os.getcwd(), "C:/Users/Attilas/Desktop/Bill/Matrix/MyProjects/Python Financial Planner/login-43889-firebase-adminsdk-cqrdd-305656598d.json")
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": "https://login-43889-default-rtdb.firebaseio.com/"
+    })
+
+background_image_path = os.path.join(os.getcwd(), "C:/Users/Attilas/Desktop/Bill/Matrix/MyProjects/Python Financial Planner/financial_planner_bg.jpg")
+
+try:
+    cred = credentials.Certificate(cred_path)
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("Firebase initialized successfully.")
+except Exception as e:
+    print(f"Error initializing Firebase: {e}")
+    messagebox.showerror("Error", "Failed to initialize Firebase. Check your configuration.")
+
+# Save user credentials to Firebase
+def save_credentials(username, password):
+    try:
+        hashed_password = password  # Replace with hashing logic for secure storage.
+        user_data = {"username": username, "password": hashed_password}
+        db.collection("users").document(username).set(user_data)
+        print(f"User {username} saved successfully to Firebase.")
+    except Exception as e:
+        print(f"Error saving credentials: {e}")
+        messagebox.showerror("Error", "Failed to save user data.")
+
+# Load user credentials from Firebase
+def load_credentials(username):
+    try:
+        doc = db.collection("users").document(username).get()
+        if doc.exists:
+            return doc.to_dict()
+        else:
+            return None
+    except Exception as e:
+        print(f"Error loading credentials: {e}")
+        messagebox.showerror("Error", "Failed to load user data.")
+        return None
 
 # Create main application window
 root = tk.Tk()
@@ -10,61 +58,40 @@ root.title("Financial Coordinator")
 root.geometry("1000x600")
 
 # Load and set background image
-background_image = Image.open("C:/Users/Attilas/Desktop/Bill/Matrix/MyProjects/Python Financial Planner/financial_planner_bg.jpg")
-background_image = background_image.resize((1000, 600), Image.LANCZOS)  # Resize image to fit the window
-bg_image = ImageTk.PhotoImage(background_image)
+try:
+    background_image = Image.open(background_image_path)
+    background_image = background_image.resize((1000, 600), Image.LANCZOS)
+    bg_image = ImageTk.PhotoImage(background_image)
+except Exception as e:
+    print(f"Error loading background image: {e}")
+    bg_image = None
 
 canvas = tk.Canvas(root, width=1000, height=600)
 canvas.pack(fill="both", expand=True)
-canvas.create_image(0, 0, image=bg_image, anchor="nw")
-
-# Local file to save credentials
-CREDENTIALS_FILE = "credentials.json"
-
-# Function to save credentials to a file
-def save_credentials(username, password):
-    credentials = {"username": username, "password": password}
-    with open(CREDENTIALS_FILE, "w") as file:
-        json.dump(credentials, file)
-
-# Function to load credentials from a file
-def load_credentials():
-    if os.path.exists(CREDENTIALS_FILE):
-        with open(CREDENTIALS_FILE, "r") as file:
-            return json.load(file)
-    return None
-
-# Load existing credentials if any
-credentials = load_credentials()
-stored_username = credentials["username"] if credentials else None
-stored_password = credentials["password"] if credentials else None
+if bg_image:
+    canvas.create_image(0, 0, image=bg_image, anchor="nw")
 
 # Signup Functionality
 def signup_process():
     def handle_signup():
-        global stored_username, stored_password
         username = username_entry.get()
         password = password_entry.get()
 
         if len(username) < 5:
             messagebox.showerror("Error", "Username must be at least 5 characters long.")
             return
-        if len(password) < 5:
-            messagebox.showerror("Error", "Password must be at least 5 characters long.")
-            return
-        if not any(char.isupper() for char in password):
-            messagebox.showerror("Error", "Password must contain at least one uppercase letter.")
+        if not re.match(r'^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{5,}$', password):
+            messagebox.showerror("Error", "Password must include uppercase, number, and special character.")
             return
 
-        # Save username and password locally
-        stored_username = username
-        stored_password = password
+        if load_credentials(username):
+            messagebox.showerror("Error", "Username already exists.")
+            return
+
         save_credentials(username, password)
-
         messagebox.showinfo("Success", "Signup successful!")
-        signup_frame.destroy()  # Close the signup frame
+        signup_frame.destroy()
 
-    # Create signup frame
     signup_frame = tk.Frame(root, bg="white", padx=20, pady=20)
     signup_frame.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -77,26 +104,33 @@ def signup_process():
     password_entry = tk.Entry(signup_frame, show="*", width=30)
     password_entry.pack(pady=5)
 
+    def toggle_password_visibility():
+        if password_entry.cget('show') == '*':
+            password_entry.config(show='')
+        else:
+            password_entry.config(show='*')
+
+    tk.Checkbutton(signup_frame, text="Show Password", command=toggle_password_visibility, bg="white").pack(pady=5)
     tk.Button(signup_frame, text="Sign Up", command=handle_signup).pack(pady=10)
 
 # Login Functionality
 def login_process():
     def handle_login():
-        global stored_username, stored_password
         username = username_entry.get()
         password = password_entry.get()
 
-        if username != stored_username:
-            messagebox.showerror("Error", "Incorrect username. Try again.")
+        user_data = load_credentials(username)
+        if not user_data:
+            messagebox.showerror("Error", "Username not found.")
             return
-        if password != stored_password:
+
+        if user_data["password"] != password:
             messagebox.showerror("Error", "Incorrect password. Try again.")
             return
 
         messagebox.showinfo("Welcome", f"Welcome to your Financial Planner, {username}!")
-        login_frame.destroy()  # Close the login frame
+        login_frame.destroy()
 
-    # Create login frame
     login_frame = tk.Frame(root, bg="white", padx=20, pady=20)
     login_frame.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -109,12 +143,19 @@ def login_process():
     password_entry = tk.Entry(login_frame, show="*", width=30)
     password_entry.pack(pady=5)
 
+    def toggle_password_visibility():
+        if password_entry.cget('show') == '*':
+            password_entry.config(show='')
+        else:
+            password_entry.config(show='*')
+
+    tk.Checkbutton(login_frame, text="Show Password", command=toggle_password_visibility, bg="white").pack(pady=5)
     tk.Button(login_frame, text="Login", command=handle_login).pack(pady=10)
 
 signup_button = tk.Button(
     root,
     text="Sign Up",
-    command=signup_process,  # Opens the signup process
+    command=signup_process,
     font=("Arial", 14),
     bg="lightblue",
     padx=20,
@@ -124,14 +165,13 @@ signup_button = tk.Button(
 login_button = tk.Button(
     root,
     text="Login",
-    command=login_process,  # Opens the login process
+    command=login_process,
     font=("Arial", 14),
     bg="lightgreen",
     padx=20,
     pady=10,
 )
 
-# Place buttons on the canvas
 canvas.create_window(500, 200, window=signup_button)
 canvas.create_window(500, 300, window=login_button)
 
